@@ -2,11 +2,12 @@ const router = require("express").Router();
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const isAuthenticated = require("../middlewares/isAuthenticated");
 
 const prisma = new PrismaClient();
 
 // 呟き投稿用API
-router.post("/post", async (req, res) => {
+router.post("/post", isAuthenticated, async (req, res) => {
   const { content } = req.body;
 
   if (!content) {
@@ -17,7 +18,10 @@ router.post("/post", async (req, res) => {
     const newPost = await prisma.post.create({
       data: {
         content,
-        authorId: 1,
+        authorId: req.userId,
+      },
+      include: {
+        author: true,
       },
     });
 
@@ -29,26 +33,20 @@ router.post("/post", async (req, res) => {
 });
 
 // 最新呟き取得用API
-// router.post("/login", async (req, res) => {
-//   const { email, password } = req.body;
-
-//   const user = await prisma.user.findUnique({ where: { email } });
-
-//   if (!user) {
-//     return res.status(401).json({ error: "そのユーザーは存在しません。" });
-//   }
-
-//   const isPasswordValid = await bcrypt.compare(password, user.password);
-
-//   if (!isPasswordValid) {
-//     return res.status(401).json({ error: "そのパスワードは間違っています。" });
-//   }
-
-//   const token = jwt.sign({ id: user.id }, process.env.SECRET_KEY, {
-//     expiresIn: "1d",
-//   });
-
-//   return res.json({ token });
-// });
+router.get("/get_latest_post", async (req, res) => {
+  try {
+    const latastPosts = await prisma.post.findMany({
+      take: 10,
+      orderBy: { createdAt: "desc" },
+      include: {
+        author: true,
+      },
+    });
+    return res.json(latastPosts);
+  } catch {
+    console.log(err);
+    res.status(500).json({ message: "サーバーエラーです。" });
+  }
+});
 
 module.exports = router;
